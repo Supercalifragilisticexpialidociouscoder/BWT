@@ -39,11 +39,11 @@ const linkCls = ({ isActive }: { isActive: boolean }) =>
 
 export function PublicLayout() {
   const { user, hasWorkspace } = useSession();
-  const signOut = useSignOut();
+  const { signOut, pending: signingOut } = useSignOut();
   const location = useLocation();
   const home = location.pathname === '/';
   const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => setOpen(false), [location.pathname, user?.id]);
 
   const nav = (
     <>
@@ -61,8 +61,8 @@ export function PublicLayout() {
         </NavLink>
       )}
       {user ? (
-        <button type="button" onClick={signOut} className="py-1 text-left text-sm text-paper-3 hover:text-paper">
-          Sign out
+        <button type="button" onClick={signOut} disabled={signingOut} className="py-1 text-left text-sm text-paper-3 hover:text-paper disabled:opacity-60">
+          {signingOut ? 'Signing out…' : 'Sign out'}
         </button>
       ) : (
         <>

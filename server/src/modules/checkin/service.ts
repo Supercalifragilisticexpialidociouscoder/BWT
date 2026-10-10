@@ -18,6 +18,8 @@ import { conflict, isDuplicateKeyError, notFound } from '../../lib/errors';
 import { escapeRegex, iso } from '../../lib/http';
 import type { AuthUser } from '../../middleware/auth';
 import { publish } from '../../realtime/bus';
+import { liveParticipation } from '../documents/service';
+import { participationBlockMessage } from '../documents/status';
 
 export interface CheckInResponse {
   httpStatus: number;
@@ -117,6 +119,16 @@ export async function performCheckIn(opts: {
       reason: window.state === 'not_open' ? 'window_not_open' : 'window_closed',
       message: window.state === 'not_open' ? `Check-in opens at ${window.opensAt.toISOString()}.` : 'Check-in for this event has closed.',
     });
+  }
+
+  // Only when the event explicitly asks for it. Evaluated from the database at scan time; volunteers
+  // learn why entry is refused, never what the documents contain. Runs after the duplicate check above,
+  // and the unique-index insert below remains the single decision point for admission.
+  if (event.participation?.checkInRequiresApproval) {
+    const participation = await liveParticipation(registration, event);
+    if (participation.status !== 'approved') {
+      return fail(422, { ...base, outcome: 'not_eligible', reason: 'participation_not_approved', message: participationBlockMessage(participation) });
+    }
   }
 
   const at = new Date();

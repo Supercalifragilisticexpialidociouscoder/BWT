@@ -26,6 +26,12 @@ export function lifecycle(r: RegistrationDTO): Step[] {
   }
   const confirmed = r.status === 'confirmed';
   steps.push({ key: 'ticket', label: 'Ticket issued', state: confirmed ? 'done' : 'todo' });
+  // Participation approval runs alongside the ticket; it only gates entry when the event says so.
+  const p = r.participation;
+  if (p && p.status !== 'not_required') {
+    const label = { not_submitted: 'Documents due', submitted: 'Documents in review', under_review: p.readyForDecision ? 'Awaiting approval' : 'Documents in review', changes_requested: 'Fix a document', approved: 'Participation approved', rejected: 'Participation declined' }[p.status];
+    steps.push({ key: 'participation', label, state: p.status === 'approved' ? 'done' : p.status === 'rejected' ? 'blocked' : 'current' });
+  }
   const attended = r.participants.some((p) => p.ticket?.status === 'checked_in');
   steps.push({ key: 'checkin', label: 'Checked in', state: attended ? 'done' : confirmed ? 'current' : 'todo' });
 

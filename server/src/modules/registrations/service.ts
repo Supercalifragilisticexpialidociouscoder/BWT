@@ -1,6 +1,7 @@
 import { Types, type HydratedDocument, type PipelineStage } from 'mongoose';
 import type {
   Page,
+  ParticipationFilter,
   ParticipantDTO,
   RegistrationDTO,
   RegistrationRowDTO,
@@ -30,6 +31,7 @@ import { publish } from '../../realtime/bus';
 import { getInstitution } from '../institution/service';
 import { coverUrl, registrationState } from '../events/service';
 import { amountDue, computeRegistrationStatus } from './status';
+import { participationSummary, touchParticipation } from '../documents/service';
 
 const ACTIVE = { $nin: ['cancelled', 'rejected'] };
 
@@ -120,6 +122,8 @@ export async function recomputeRegistration(regId: Types.ObjectId): Promise<IReg
   }
   if (current.status === 'confirmed') await issueTickets(current);
   else await voidTickets({ registration: current._id }, reason || 'Registration no longer confirmed');
+  // Team changes alter which documents are owed; participation never feeds back into status or tickets.
+  await touchParticipation(current._id);
   return current;
 }
 
@@ -806,6 +810,7 @@ export async function registrationDTO(regId: Types.ObjectId, viewer: AuthUser): 
       decidedBy: approver ? { id: String(approver._id), name: approver.name } : null,
       note: reg.approval?.note ?? null,
     },
+    participation: participationSummary(reg, event),
     createdAt: reg.createdAt.toISOString(),
     updatedAt: reg.updatedAt.toISOString(),
     cancelledAt: iso(reg.cancelledAt),
@@ -839,6 +844,15 @@ const SORTS: Record<string, Record<string, 1 | -1>> = {
   '-status': { status: -1, code: 1 },
 };
 
+const PARTICIPATION_MATCH: Record<ParticipationFilter, Record<string, unknown>> = {
+  approval_pending: { 'participation.readyForDecision': true },
+  docs_missing: { 'participation.counts.missing': { $gt: 0 } },
+  awaiting_review: { 'participation.counts.awaitingReview': { $gt: 0 } },
+  changes_requested: { 'participation.status': 'changes_requested' },
+  approved: { 'participation.status': 'approved' },
+  rejected: { 'participation.status': 'rejected' },
+};
+
 export async function listRegistrations(
   eventId: Types.ObjectId,
   query: {
@@ -846,6 +860,7 @@ export async function listRegistrations(
     status?: string;
     payment?: string;
     paymentStage?: 'awaiting_reference' | 'awaiting_verification';
+    participation?: ParticipationFilter;
     sort: string;
     page: number;
     pageSize: number;
@@ -853,6 +868,7 @@ export async function listRegistrations(
 ): Promise<Page<RegistrationRowDTO>> {
   const match: Record<string, unknown> = { event: eventId };
   if (query.status) match.status = query.status;
+  if (query.participation) Object.assign(match, PARTICIPATION_MATCH[query.participation], query.status ? {} : { status: ACTIVE });
 
   const pipeline: PipelineStage[] = [
     { $match: match },
@@ -923,6 +939,12 @@ export async function listRegistrations(
         reference: r.payment?.reference ?? null,
         amountDue: r.payment?.amountDue ?? 0,
         submittedAt: iso(r.payment?.submittedAt),
+      },
+      participation: {
+        status: r.participation?.status ?? 'not_required',
+        missing: r.participation?.counts?.missing ?? 0,
+        awaitingReview: r.participation?.counts?.awaitingReview ?? 0,
+        readyForDecision: r.participation?.readyForDecision ?? false,
       },
       source: r.source,
       createdAt: r.createdAt.toISOString(),

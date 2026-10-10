@@ -32,6 +32,7 @@ import {
 } from '../models';
 import { issueTickets, recomputeRegistration } from '../modules/registrations/service';
 import { randomCode } from '../lib/crypto';
+import { seedRegistrationDocuments, type DemoOutcome } from './documents';
 
 const TZ = 'Asia/Kolkata';
 export const DEMO_PASSWORD = 'campusflow-demo';
@@ -376,6 +377,58 @@ async function main() {
     expectedAttendance: 25,
   });
 
+  // Collects documents and approves participation before entry (see seed/documents.ts).
+  const buildathon = await mkEvent({
+    title: 'Infin8 Overnight Buildathon',
+    category: 'hackathon',
+    organization: orgs['Club Infin8']!,
+    createdBy: head._id,
+    summary: 'Eighteen hours on campus, overnight, in teams of two to four. Every participant’s documents are checked before entry.',
+    description:
+      'An overnight build on campus from Friday evening to Saturday noon. Because it runs overnight, the club collects a permission letter and a parent or guardian undertaking from every participant, and only participants whose participation is approved are admitted at the gate.\n\nThis is a demonstration event: its document requirements show how CAMPUSFLOW collects and reviews documents. They are not an official institutional process, and the sample files carry no real signatures.',
+    eligibility: 'Undergraduate students of all departments.',
+    rules: ['Every member uploads their own documents.', 'Entry only after the organizers approve participation.'],
+    startsAt: day(10, '18:00'),
+    endsAt: day(11, '12:00'),
+    registrationDeadline: day(7, '23:59'),
+    mode: 'team',
+    teamSize: { min: 2, max: 4 },
+    capacity: 20,
+    requiredFacilities: ['computers', 'wifi', 'power_outlets'],
+    expectedAttendance: 60,
+    participation: { approvalRequired: true, checkInRequiresApproval: true },
+    documentRequirements: [
+      {
+        key: 'demoperm',
+        type: 'permission_letter',
+        name: 'Participation permission letter',
+        description: 'A letter from your Head of Department permitting you to stay on campus overnight for this event, in your department’s own letter format.',
+        required: true,
+        appliesTo: 'each_member',
+        deadline: day(8, '18:00'),
+        formats: ['pdf'],
+        reviewRequired: true,
+        active: true,
+        template: null,
+        createdAt: now,
+      },
+      {
+        key: 'demogrdn',
+        type: 'guardian_undertaking',
+        name: 'Parent / guardian undertaking',
+        description: 'Signed by your parent or guardian, on the form your institution provides. A scan or clear photo is fine.',
+        required: true,
+        appliesTo: 'each_member',
+        deadline: day(8, '18:00'),
+        formats: ['pdf', 'jpg', 'png'],
+        reviewRequired: true,
+        active: true,
+        template: null,
+        createdAt: now,
+      },
+    ],
+  });
+
   const sprint = await mkEvent({
     title: 'Code Sprint: Autumn Round',
     category: 'competition',
@@ -445,6 +498,7 @@ async function main() {
   await book(cricket, 'Sports Ground');
   await book(meetup, 'Conference Room');
   await book(sprint, 'Classroom B-204');
+  await book(buildathon, 'Innovation Lab');
   await book(bootcamp, 'Seminar Hall 1');
   // The seminar intentionally has no venue yet: the overview flags it and the planner can propose one.
 
@@ -593,6 +647,23 @@ async function main() {
 
   // Build night: 24 of 25 seats.
   for (let i = 0; i < 24; i++) await individual(meetup, nextPeople(1)[0]!, createdAtFor(meetup, i, 24));
+
+  // Overnight buildathon: six teams across every document and approval state. The demo
+  // participant leads "Night Owls" (one document approved, one sent back for changes).
+  const buildPlans: { name: string; size: number; plan: DemoOutcome[][]; approve?: boolean }[] = [
+    { name: 'Night Owls', size: 3, plan: [['approved', 'changes_requested'], ['submitted', 'submitted'], ['missing', 'missing']] },
+    { name: teamName(), size: 3, plan: [['approved', 'approved'], ['approved', 'approved'], ['approved', 'approved']], approve: true },
+    { name: teamName(), size: 2, plan: [['approved', 'approved'], ['approved', 'approved']] },
+    { name: teamName(), size: 4, plan: [['submitted', 'submitted'], ['submitted', 'approved'], ['approved', 'submitted'], ['submitted', 'submitted']] },
+    { name: teamName(), size: 2, plan: [['rejected', 'approved'], ['approved', 'approved']] },
+    { name: teamName(), size: 3, plan: [['submitted', 'missing'], ['missing', 'missing'], ['missing', 'missing']] },
+  ];
+  for (const [i, p] of buildPlans.entries()) {
+    const members = i === 0 ? [student._id, ...nextPeople(p.size - 1)] : nextPeople(p.size);
+    teamNames.add(p.name);
+    const reg = await team(buildathon, p.name, members, createdAtFor(buildathon, i, buildPlans.length));
+    await seedRegistrationDocuments({ event: buildathon, registrationId: reg._id, reviewer: head._id, plan: p.plan, approveParticipation: p.approve, now });
+  }
 
   // Past code sprint: 48 paid & verified, 3 never paid.
   const sprintRegs = [];

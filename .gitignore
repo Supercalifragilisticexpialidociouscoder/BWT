@@ -6,9 +6,11 @@ coverage/
 *.log
 .DS_Store
 server/uploads/
+server/private-documents/
 web/test-results/
 web/playwright-report/
 web/e2e/.fixtures/
 .vite/
 .claude/settings.local.json
 server/test/.uploads/
+server/test/.documents/

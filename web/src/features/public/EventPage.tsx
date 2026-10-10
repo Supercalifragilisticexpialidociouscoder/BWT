@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Check, Copy, Flag, ScanLine, Settings2, Ticket, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Copy, FileText, Flag, ScanLine, Settings2, Ticket, XCircle } from 'lucide-react';
 import { CategoryMark } from '../../components/CategoryMark';
 import { useState } from 'react';
 import type { EventDetailDTO } from '@campusflow/shared';
@@ -13,6 +13,8 @@ import { DemoBadge, LiveDot, StatusPill } from '../../components/ui/Status';
 import { ButtonLink } from '../../components/ui/Button';
 import { ErrorState, Skeleton } from '../../components/ui/Feedback';
 import { NotFound } from '../../router';
+import { formatList, templateUrl } from '../documents/RegistrationDocuments';
+import { LABELS } from '@campusflow/shared';
 
 export function useEventDetail(ref: string | undefined) {
   return useQuery({
@@ -119,6 +121,36 @@ export function EventPage() {
               <Section title="Who can take part">
                 {e.eligibility && <p className="text-[15.5px] leading-[1.7] text-paper-2">{e.eligibility}</p>}
                 {allowed.length > 0 && <p className="mt-3 text-sm text-paper-3">Open to: {allowed.join(', ')}</p>}
+              </Section>
+            )}
+            {(e.documents.requirements.length > 0 || e.documents.approvalRequired) && (
+              <Section title="Documents you’ll need">
+                {e.documents.requirements.length > 0 && (
+                  <ul className="divide-y divide-line border-b border-line">
+                    {e.documents.requirements.map((d) => (
+                      <li key={d.key} className="py-3 first:pt-0">
+                        <p className="flex flex-wrap items-baseline gap-x-3 text-paper">
+                          {d.name}
+                          <span className="kicker !text-[10px] text-paper-3">{d.required ? 'Required' : 'Optional'}</span>
+                        </p>
+                        <p className="mt-0.5 text-sm text-paper-3">
+                          {[e.mode === 'team' ? LABELS.documentScope[d.appliesTo] : null, formatList(d.formats), d.deadline ? `due ${fmt.dateTime(d.deadline)}` : null].filter(Boolean).join(' · ')}
+                        </p>
+                        {d.description && <p className="mt-1.5 max-w-prose whitespace-pre-line text-[15px] leading-relaxed text-paper-2">{d.description}</p>}
+                        {d.template && (
+                          <a href={templateUrl(e.id, d.key)} className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-paper underline decoration-signal underline-offset-4">
+                            <FileText className="size-3.5" aria-hidden /> Organizers’ form: {d.template.name}
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-3 text-sm text-paper-3">
+                  You upload these after registering; they stay private to you and the organizers.
+                  {e.documents.approvalRequired && ' Organizers approve each participant’s participation after checking them.'}
+                  {e.documents.checkInRequiresApproval && ' Entry is only possible once participation is approved.'}
+                </p>
               </Section>
             )}
             {e.schedule.length > 0 && (

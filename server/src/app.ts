@@ -16,6 +16,7 @@ import { registrationsRouter } from './modules/registrations/routes';
 import { checkinRouter } from './modules/checkin/routes';
 import { venuesRouter } from './modules/venues/routes';
 import { reportsRouter } from './modules/reports/routes';
+import { documentsRouter } from './modules/documents/routes';
 import { importsRouter } from './modules/imports/routes';
 import { logger } from './lib/logger';
 
@@ -59,7 +60,7 @@ export function createApp() {
   });
 
   app.use('/api', apiLimiter, requireClientHeader, loadSession);
-  app.use('/api', authRouter, institutionRouter, eventsRouter, registrationsRouter, checkinRouter, venuesRouter, reportsRouter, importsRouter);
+  app.use('/api', authRouter, institutionRouter, eventsRouter, registrationsRouter, documentsRouter, checkinRouter, venuesRouter, reportsRouter, importsRouter);
   app.use('/api', notFoundHandler);
 
   app.use(

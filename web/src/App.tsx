@@ -3,7 +3,7 @@ import { RouterProvider } from 'react-router';
 import type { InstitutionDTO } from '@campusflow/shared';
 import { api } from './lib/api';
 import { InstitutionProvider } from './lib/institution';
-import { useSession } from './lib/session';
+import { useSession, useSessionGuard } from './lib/session';
 import { router } from './router';
 import { Wordmark } from './components/Wordmark';
 import { ErrorState } from './components/ui/Feedback';
@@ -11,6 +11,7 @@ import { ErrorState } from './components/ui/Feedback';
 export function App() {
   const inst = useQuery({ queryKey: ['institution'], queryFn: () => api<InstitutionDTO>('/institution'), staleTime: 5 * 60_000 });
   const session = useSession();
+  useSessionGuard(session.data ? (session.user?.id ?? null) : undefined);
 
   if (inst.isError) {
     return (

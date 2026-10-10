@@ -12,6 +12,13 @@ export function attachIo(server: Server | null) {
 }
 
 export const eventRoom = (eventId: string) => `event:${eventId}`;
+/** Every socket joins the room of the session that authenticated it, so ending the session can close them. */
+export const sessionRoom = (sessionId: string) => `session:${sessionId}`;
+
+/** Disconnect the sockets authenticated by a session (on logout); they stop receiving live updates at once. */
+export function disconnectSession(sessionId: string) {
+  io?.in(sessionRoom(sessionId)).disconnectSockets(true);
+}
 
 export type RealtimeMessage =
   | { type: 'checkin.created'; checkInId: string; at: string; participantName: string; teamName: string | null; method: string }

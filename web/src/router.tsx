@@ -26,9 +26,10 @@ function Root() {
 }
 
 export function RequireAuth() {
-  const { user } = useSession();
+  const { user, endedHere } = useSession();
   const location = useLocation();
-  if (!user) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  // After a deliberate sign-out, leave protected pages for the public home rather than a sign-in form.
+  if (!user) return <Navigate to={endedHere ? '/' : `/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   return <Outlet />;
 }
 

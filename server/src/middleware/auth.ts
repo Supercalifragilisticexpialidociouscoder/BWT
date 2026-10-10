@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { randomToken, sha256 } from '../lib/crypto';
 import { forbidden, unauthorized } from '../lib/errors';
 import { Session, User, type IUser } from '../models';
+import { disconnectSession } from '../realtime/bus';
 import type { UserRole } from '@campusflow/shared';
 
 export const SESSION_COOKIE = 'cf_sid';
@@ -50,7 +51,10 @@ export async function createSession(res: Response, userId: Types.ObjectId, userA
 }
 
 export async function destroySession(req: Request, res: Response): Promise<void> {
-  if (req.sessionId) await Session.deleteOne({ _id: req.sessionId });
+  if (req.sessionId) {
+    await Session.deleteOne({ _id: req.sessionId });
+    disconnectSession(String(req.sessionId));
+  }
   res.clearCookie(SESSION_COOKIE, { ...sessionCookieOptions(), maxAge: undefined });
 }
 

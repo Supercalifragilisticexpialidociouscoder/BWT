@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeCheck, Ban, Copy, Crown, TriangleAlert, Undo2, X } from 'lucide-react';
 import { formatMoney, LABELS, type RegistrationDTO } from '@campusflow/shared';
-import { api, errorMessage } from '../../lib/api';
+import { api, ApiError, errorMessage } from '../../lib/api';
 import { useFormat, relativeTime } from '../../lib/format';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog, Dialog } from '../../components/ui/Dialog';
@@ -12,6 +12,7 @@ import { StatusPill } from '../../components/ui/Status';
 import { useToast } from '../../components/ui/Toast';
 import { useEventChannel } from '../../lib/realtime';
 import { RegistrationProgress } from '../participant/Progress';
+import { RegistrationDocuments, documentsKey } from '../documents/RegistrationDocuments';
 
 /** Keeps workspace lists in sync with writes made elsewhere (other organizers, the gate). */
 export function useLiveInvalidation(eventId: string | undefined) {
@@ -21,6 +22,7 @@ export function useLiveInvalidation(eventId: string | undefined) {
       if (u.type === 'registration.changed' || u.type === 'payment.changed') {
         qc.invalidateQueries({ queryKey: ['registrations', eventId] });
         qc.invalidateQueries({ queryKey: ['registration', u.registrationId as string] });
+        qc.invalidateQueries({ queryKey: documentsKey(u.registrationId as string) });
         qc.invalidateQueries({ queryKey: ['teams', eventId] });
       }
       if (u.type === 'checkin.created' || u.type === 'checkin.voided') {
@@ -81,7 +83,15 @@ export function RegistrationDrawer({ id, onClose }: { id: string | null; onClose
         ) : undefined
       }
     >
-      {q.isError ? (
+      {q.isError && q.error instanceof ApiError && q.error.status === 404 ? (
+        <div className="space-y-4 text-sm">
+          <p className="text-paper">This registration doesn’t exist, or you can’t see it.</p>
+          <p className="text-paper-2">The link may point to a registration of another event, one you don’t manage, or data that was reset (for example by <span className="font-mono text-[13px]">npm run demo:reset</span>).</p>
+          <Button size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      ) : q.isError ? (
         <ErrorState error={q.error} onRetry={() => q.refetch()} />
       ) : !r ? (
         <LoadingBlock />
@@ -204,6 +214,21 @@ export function RegistrationDrawer({ id, onClose }: { id: string | null; onClose
               )}
             </section>
           )}
+
+          <RegistrationDocuments
+            registrationId={r.id}
+            eventId={r.event.id}
+            mode="organizer"
+            closed={Boolean(closed)}
+            heading={(content) =>
+              content && (
+                <section>
+                  <h3 className="kicker mb-3 text-paper-3">Documents & participation</h3>
+                  {content}
+                </section>
+              )
+            }
+          />
 
           <section className="space-y-1 text-xs text-paper-3">
             <p>

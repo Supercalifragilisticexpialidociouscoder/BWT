@@ -304,6 +304,44 @@ async function attentionItems(user: AuthUser, events: IEvent[], now: Date): Prom
     );
   }
 
+  const docEvents = live.filter((e) => e.documentRequirements?.some((r) => r.active && r.reviewRequired) || e.participation?.approvalRequired).map((e) => e._id);
+  if (docEvents.length) {
+    const rows = await Registration.aggregate<{ _id: Types.ObjectId; review: number; decide: number }>([
+      { $match: { event: { $in: docEvents }, status: { $nin: ['cancelled', 'rejected'] } } },
+      {
+        $group: {
+          _id: '$event',
+          review: { $sum: { $cond: [{ $gt: ['$participation.counts.awaitingReview', 0] }, 1, 0] } },
+          decide: { $sum: { $cond: [{ $eq: ['$participation.readyForDecision', true] }, 1, 0] } },
+        },
+      },
+    ]);
+    for (const r of rows) {
+      if (r.review) {
+        items.push({
+          kind: 'documents_awaiting_review',
+          severity: 'medium',
+          eventId: String(r._id),
+          eventTitle: title.get(String(r._id)) ?? '',
+          count: r.review,
+          message: `${r.review} registration${r.review === 1 ? ' has' : 's have'} documents awaiting review`,
+          href: `/workspace/registrations?event=${r._id}&participation=awaiting_review`,
+        });
+      }
+      if (r.decide) {
+        items.push({
+          kind: 'documents_awaiting_review',
+          severity: 'medium',
+          eventId: String(r._id),
+          eventTitle: title.get(String(r._id)) ?? '',
+          count: r.decide,
+          message: `${r.decide} registration${r.decide === 1 ? ' is' : 's are'} ready for a participation decision`,
+          href: `/workspace/registrations?event=${r._id}&participation=approval_pending`,
+        });
+      }
+    }
+  }
+
   const soon = live.filter((e) => e.mode === 'team' && e.registrationDeadline > now && e.registrationDeadline.getTime() - now.getTime() < 3 * DAY_MS);
   if (soon.length) {
     const rows = await Registration.aggregate<{ _id: Types.ObjectId; n: number }>([

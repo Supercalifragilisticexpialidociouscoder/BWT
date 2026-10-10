@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { EventSummaryDTO, RegistrationDTO } from '@campusflow/shared';
 import { primaryAction } from '../features/public/universe/EventPanel';
 import { lifecycle } from '../features/participant/Progress';
+import { nextAction } from '../features/participant/MyEventsPage';
+import { withEvent } from '../features/workspace/context';
 import { categoryForm } from '../lib/categories';
 import { buildLayout } from '../three/layout';
 
@@ -76,6 +78,26 @@ describe('registration lifecycle', () => {
     expect(steps.filter((s) => s.state === 'current')).toHaveLength(1);
     expect(steps.find((s) => s.key === 'team')!.state).toBe('current');
   });
+  it('adds a participation step only when the event collects documents, without blocking the ticket', () => {
+    const p = (status: RegistrationDTO['participation']['status'], readyForDecision = false) =>
+      ({ status, readyForDecision, approvalRequired: true, checkInRequiresApproval: false, counts: { required: 1, missing: status === 'not_submitted' ? 1 : 0, awaitingReview: 0, changesRequested: 0, approved: 0 } }) as RegistrationDTO['participation'];
+    expect(lifecycle(reg({ participation: p('not_required') })).map((s) => s.key)).toEqual(['registered', 'ticket', 'checkin']);
+    const due = lifecycle(reg({ participation: p('not_submitted') }));
+    expect(due.map((s) => s.key)).toEqual(['registered', 'ticket', 'participation', 'checkin']);
+    expect(due.find((s) => s.key === 'ticket')!.state).toBe('done');
+    expect(due.find((s) => s.key === 'participation')).toMatchObject({ state: 'current', label: 'Documents due' });
+    expect(due.filter((s) => s.state === 'current')).toHaveLength(1);
+    expect(lifecycle(reg({ participation: p('under_review', true) })).find((s) => s.key === 'participation')!.label).toBe('Awaiting approval');
+    expect(lifecycle(reg({ participation: p('approved') })).find((s) => s.key === 'participation')!.state).toBe('done');
+    expect(lifecycle(reg({ participation: p('rejected') })).find((s) => s.key === 'participation')!.state).toBe('blocked');
+  });
+  it('asks the participant to act when documents are missing or need fixing', () => {
+    const p = (status: RegistrationDTO['participation']['status'], missing = 0) =>
+      ({ status, readyForDecision: false, approvalRequired: false, checkInRequiresApproval: false, counts: { required: 2, missing, awaitingReview: 0, changesRequested: 0, approved: 0 } }) as RegistrationDTO['participation'];
+    expect(nextAction(reg({ participation: p('not_submitted', 2) }))).toEqual({ label: 'Upload documents', detail: '2 required documents still missing' });
+    expect(nextAction(reg({ participation: p('changes_requested') }))!.label).toBe('Fix a document');
+    expect(nextAction(reg({ participation: p('submitted') }))).toBeNull();
+  });
 });
 
 describe('category grammar and layout', () => {
@@ -102,5 +124,12 @@ describe('category grammar and layout', () => {
     expect(layout.nodes).toEqual([]);
     expect(layout.lanes).toEqual([]);
     expect(layout.weeks.length).toBeGreaterThan(0);
+  });
+});
+
+describe('switching the workspace event', () => {
+  it('keeps filters but drops the page and the previous event’s open registration', () => {
+    const next = withEvent(new URLSearchParams('event=a&reg=r1&page=3&status=pending&participation=docs_missing'), 'b');
+    expect(Object.fromEntries(next)).toEqual({ event: 'b', status: 'pending', participation: 'docs_missing' });
   });
 });

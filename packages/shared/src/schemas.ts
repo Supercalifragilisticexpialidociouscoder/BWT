@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import {
   ALLOCATION_STATUSES,
+  DOCUMENT_FORMATS,
+  DOCUMENT_SCOPES,
+  DOCUMENT_STATUSES,
+  DOCUMENT_TYPES,
   EVENT_STATUSES,
   FEE_BASIS,
   IMPORT_FIELDS,
@@ -8,6 +12,7 @@ import {
   REGISTRATION_MODES,
   REGISTRATION_STATUSES,
   PAYMENT_STATUSES,
+  PARTICIPATION_FILTERS,
   STAFF_ROLES,
   USER_ROLES,
   VENUE_KINDS,
@@ -279,10 +284,78 @@ export const RegistrationListQuerySchema = z.object({
   status: z.enum(REGISTRATION_STATUSES).optional(),
   payment: z.enum(PAYMENT_STATUSES).optional(),
   paymentStage: z.enum(['awaiting_reference', 'awaiting_verification']).optional(),
+  participation: z.enum(PARTICIPATION_FILTERS).optional(),
   sort: z.enum(['createdAt', '-createdAt', 'code', '-code', 'name', '-name', 'status', '-status']).default('-createdAt'),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
+
+/* ------------------------------------------------------------------ documents & participation approval */
+
+export const requirementKeyField = z.string().regex(/^[a-z0-9]{8}$/, 'Unknown document requirement');
+
+export const DocumentRequirementInputSchema = z.object({
+  /** Present for requirements that already exist; the server assigns keys to new ones. */
+  key: requirementKeyField.optional(),
+  type: z.enum(DOCUMENT_TYPES),
+  name: z.string().trim().min(3, 'Name the document').max(120, 'Keep the name under 120 characters'),
+  description: optionalText(1500),
+  required: z.boolean().default(true),
+  appliesTo: z.enum(DOCUMENT_SCOPES).default('each_member'),
+  deadline: isoDateTime.nullable().default(null),
+  formats: z
+    .array(z.enum(DOCUMENT_FORMATS))
+    .min(1, 'Accept at least one file format')
+    .transform((list) => [...new Set(list)]),
+  reviewRequired: z.boolean().default(true),
+  active: z.boolean().default(true),
+});
+export type DocumentRequirementInput = z.infer<typeof DocumentRequirementInputSchema>;
+
+export const DocumentConfigSchema = z
+  .object({
+    /** Organizers explicitly approve each registration's participation after checking documents. */
+    approvalRequired: z.boolean(),
+    /** Scanners refuse entry until participation is approved. */
+    checkInRequiresApproval: z.boolean(),
+    requirements: z.array(DocumentRequirementInputSchema).max(10, 'Up to 10 document requirements per event'),
+  })
+  .refine((v) => !v.checkInRequiresApproval || v.approvalRequired, {
+    path: ['checkInRequiresApproval'],
+    message: 'Check-in can only wait for an approval organizers actually give — turn on participation approval first',
+  })
+  .refine((v) => new Set(v.requirements.filter((r) => r.key).map((r) => r.key)).size === v.requirements.filter((r) => r.key).length, {
+    path: ['requirements'],
+    message: 'A requirement appears twice',
+  });
+export type DocumentConfigInput = z.infer<typeof DocumentConfigSchema>;
+
+export const DocumentReviewSchema = z
+  .object({
+    action: z.enum(['approve', 'request_changes', 'reject', 'comment']),
+    note: optionalText(1000),
+    /** The version the reviewer opened. A newer upload makes the decision stale (409). */
+    version: z.number().int().min(1),
+    /** The status the reviewer saw. Someone else deciding first makes the decision stale (409). */
+    expectedStatus: z.enum(DOCUMENT_STATUSES),
+  })
+  .refine((v) => v.action === 'approve' || v.note.length >= 3, {
+    path: ['note'],
+    message: 'Tell the participant what needs to change',
+  });
+export type DocumentReviewInput = z.infer<typeof DocumentReviewSchema>;
+
+export const ParticipationDecisionSchema = z
+  .object({
+    action: z.enum(['approve', 'reject', 'reopen']),
+    note: optionalText(500),
+    /** The `participation.rev` the organizer was looking at; a change since then makes the decision stale (409). */
+    rev: z.number().int().min(0),
+  })
+  .refine((v) => v.action !== 'reject' || v.note.length >= 3, {
+    path: ['note'],
+    message: 'Explain why participation is not approved',
+  });
 
 /* ------------------------------------------------------------------ check-in */
 

@@ -36,6 +36,18 @@ export function defaultEvent(events: WorkspaceEventDTO[], manageOnly = false): W
 }
 
 /**
+ * URL parameters after switching the event in focus. Filters carry over; the page number and an open
+ * registration belong to the previous event and are dropped.
+ */
+export function withEvent(prev: URLSearchParams, id: string): URLSearchParams {
+  const next = new URLSearchParams(prev);
+  next.set('event', id);
+  next.delete('page');
+  next.delete('reg');
+  return next;
+}
+
+/**
  * The event a workspace page is scoped to. Kept in `?event=` so views are linkable,
  * remembered per browser as a convenience.
  */
@@ -54,6 +66,9 @@ export function useWorkspaceEvent(options: { manageOnly?: boolean } = {}) {
     if (selected && fromUrl !== selected.id) {
       setParams(
         (prev) => {
+          // The URL named an event that is gone or not yours: what else it points at (an open
+          // registration, a page) belonged to that event, so it goes too.
+          if (fromUrl) return withEvent(prev, selected.id);
           const next = new URLSearchParams(prev);
           next.set('event', selected.id);
           return next;
@@ -65,15 +80,7 @@ export function useWorkspaceEvent(options: { manageOnly?: boolean } = {}) {
 
   const select = useCallback(
     (id: string) =>
-      setParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set('event', id);
-          next.delete('page');
-          return next;
-        },
-        { replace: false },
-      ),
+      setParams((prev) => withEvent(prev, id), { replace: false }),
     [setParams],
   );
 

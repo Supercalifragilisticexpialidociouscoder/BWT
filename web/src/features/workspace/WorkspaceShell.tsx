@@ -17,6 +17,7 @@ import {
   X,
   ArrowUpRight,
   Layers,
+  Plus,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { LABELS } from '@campusflow/shared';
@@ -25,7 +26,8 @@ import { useFormat } from '../../lib/format';
 import { Wordmark } from '../../components/Wordmark';
 import { DemoStrip } from '../public/PublicLayout';
 import { NotFound } from '../../router';
-import { useWorkspaceEvents, defaultEvent } from './context';
+import { ButtonLink } from '../../components/ui/Button';
+import { useWorkspaceEvents, defaultEvent, withEvent } from './context';
 
 interface NavItem {
   to: string;
@@ -37,7 +39,7 @@ interface NavItem {
 
 export function WorkspaceShell() {
   const { user, access, hasWorkspace, managesAny } = useSession();
-  const signOut = useSignOut();
+  const { signOut, pending: signingOut } = useSignOut();
   const events = useWorkspaceEvents();
   const location = useLocation();
   const [params] = useSearchParams();
@@ -96,8 +98,14 @@ export function WorkspaceShell() {
       </div>
 
       {managesAny && (
-        <div className="px-3 pb-3">
+        <div className="space-y-2 px-3 pb-3">
           <EventSwitcher />
+          {/* Organizers create events for their clubs; administrators for any organization. */}
+          {access.canOrganize && (
+            <ButtonLink to="/workspace/events/new" variant="secondary" size="sm" className="w-full" icon={<Plus className="size-4" />}>
+              New event
+            </ButtonLink>
+          )}
         </div>
       )}
 
@@ -159,8 +167,8 @@ export function WorkspaceShell() {
           <Link to="/" className="inline-flex items-center gap-1 text-paper-3 hover:text-paper">
             Public site <ArrowUpRight className="size-3" />
           </Link>
-          <button type="button" onClick={signOut} className="inline-flex items-center gap-1 text-paper-3 hover:text-paper">
-            <LogOut className="size-3" /> Sign out
+          <button type="button" onClick={signOut} disabled={signingOut} className="inline-flex items-center gap-1 text-paper-3 hover:text-paper disabled:opacity-60">
+            <LogOut className="size-3" /> {signingOut ? 'Signing out…' : 'Sign out'}
           </button>
         </div>
       </div>
@@ -212,17 +220,7 @@ function EventSwitcher() {
       <select
         className="field !py-2 !text-[13px]"
         value={current?.id ?? ''}
-        onChange={(e) =>
-          setParams(
-            (prev) => {
-              const next = new URLSearchParams(prev);
-              next.set('event', e.target.value);
-              next.delete('page');
-              return next;
-            },
-            { replace: false },
-          )
-        }
+        onChange={(e) => setParams((prev) => withEvent(prev, e.target.value), { replace: false })}
       >
         {upcoming.length > 0 && (
           <optgroup label="Upcoming & live">
