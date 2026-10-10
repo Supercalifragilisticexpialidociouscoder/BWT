@@ -1,0 +1,53 @@
+{
+  "name": "@campusflow/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@campusflow/shared": "*",
+    "@date-fns/tz": "^1.5.0",
+    "@fontsource-variable/fraunces": "^5.2.8",
+    "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource-variable/geist-mono": "^5.2.7",
+    "@hookform/resolvers": "^5.2.2",
+    "@react-three/fiber": "^9.3.0",
+    "@tanstack/react-query": "^5.90.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^1.54.0",
+    "motion": "^12.43.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-hook-form": "^7.62.0",
+    "react-router": "^7.18.4",
+    "socket.io-client": "^4.8.1",
+    "three": "^0.186.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^27.0.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4",
+    "vitest": "^4.1.11"
+  }
+}
