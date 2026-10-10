@@ -1,0 +1,273 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/fraunces/full-italic.css';
+@import '@fontsource-variable/geist/index.css';
+@import '@fontsource-variable/geist-mono/index.css';
+
+/* ==========================================================================
+   CAMPUSFLOW design tokens
+   Dark editorial system: near-black warm surfaces, warm paper type, one
+   "signal" accent. Status colours are reserved for state and always ship
+   with an icon + label. Palette validated for CVD separation on #151412.
+   ========================================================================== */
+
+@theme {
+  /* Surfaces — warm near-blacks, one step apart */
+  --color-ink-950: #0c0b0a; /* page */
+  --color-ink-900: #151412; /* surface */
+  --color-ink-850: #1b1a17; /* raised */
+  --color-ink-800: #23211d; /* hover / input */
+  --color-ink-700: #2f2c27; /* strong rule */
+  --color-ink-600: #3d3a33;
+
+  /* Type — warm paper */
+  --color-paper: #f2ece2;
+  --color-paper-2: #bdb6aa;
+  --color-paper-3: #8c867b;
+
+  /* Hairlines */
+  --color-line: rgb(242 236 226 / 0.09);
+  --color-line-strong: rgb(242 236 226 / 0.17);
+
+  /* The one accent */
+  --color-signal: #c9f03c;
+  --color-signal-2: #dcf77a;
+  --color-signal-ink: #10130a;
+
+  /* Status — reserved */
+  --color-ok: #3dd39b;
+  --color-warn: #f2b441;
+  --color-bad: #f25060;
+  --color-info: #7aa7e8;
+
+  /* Type families */
+  --font-display: 'Fraunces Variable', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Type scale */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  /* Radii — small and deliberate; no pill-everything */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --animate-pulse-dot: pulse-dot 2.4s var(--ease-standard) infinite;
+  --animate-rise: rise 520ms var(--ease-out-expo) both;
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.8); }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+:root {
+  /* Durations: short for operations, long for editorial moments */
+  --dur-micro: 120ms;
+  --dur-fast: 180ms;
+  --dur-base: 260ms;
+  --dur-panel: 360ms;
+  --dur-editorial: 720ms;
+  --dur-cinematic: 1400ms;
+
+  --shell-sidebar: 232px;
+  --gutter: clamp(16px, 4vw, 48px);
+
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ base */
+
+@layer base {
+  html {
+    background: var(--color-ink-950);
+    color: var(--color-paper);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    min-height: 100dvh;
+    background: var(--color-ink-950);
+    font-feature-settings: 'ss01' 1, 'cv11' 1;
+  }
+  ::selection {
+    background: var(--color-signal);
+    color: var(--color-signal-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  dialog {
+    color: inherit;
+  }
+  dialog::backdrop {
+    background: rgb(6 6 5 / 0.72);
+    backdrop-filter: blur(2px);
+  }
+  hr {
+    border-color: var(--color-line);
+  }
+}
+
+/* ------------------------------------------------------------------ typography utilities */
+
+@utility display-xl {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
+  font-weight: 340;
+  font-size: clamp(3.1rem, 8.6vw, 9rem);
+  line-height: 0.88;
+  letter-spacing: -0.04em;
+}
+@utility display-lg {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 120, 'SOFT' 20;
+  font-weight: 360;
+  font-size: clamp(2.3rem, 5.2vw, 4.6rem);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+@utility display-md {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 72, 'SOFT' 10;
+  font-weight: 400;
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.022em;
+}
+@utility display-sm {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 36;
+  font-weight: 450;
+  font-size: 1.375rem;
+  line-height: 1.15;
+  letter-spacing: -0.012em;
+}
+/* Small uppercase mono label used for kickers, metadata and table headers */
+@utility kicker {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+@utility italic-accent {
+  font-style: italic;
+  font-variation-settings: 'opsz' 144, 'SOFT' 100, 'WONK' 1;
+}
+
+/* ------------------------------------------------------------------ surfaces & controls */
+
+@utility hairline {
+  border-color: var(--color-line);
+}
+@utility panel {
+  background: var(--color-ink-900);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+@utility field {
+  width: 100%;
+  background: var(--color-ink-800);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  color: var(--color-paper);
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+  &::placeholder {
+    color: var(--color-paper-3);
+  }
+  &:hover {
+    border-color: var(--color-line-strong);
+  }
+  &:focus {
+    outline: none;
+    border-color: var(--color-signal);
+    background: var(--color-ink-850);
+  }
+  &[aria-invalid='true'] {
+    border-color: var(--color-bad);
+  }
+}
+
+/* Film grain for editorial surfaces only (very low opacity, static). */
+@utility grain {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .status-dot {
+    forced-color-adjust: none;
+  }
+}

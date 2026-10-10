@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+*.log
+.DS_Store
+server/uploads/
+web/test-results/
+web/playwright-report/
+web/e2e/.fixtures/
+.vite/
+.claude/settings.local.json
+server/test/.uploads/

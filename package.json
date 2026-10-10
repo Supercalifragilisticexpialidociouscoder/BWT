@@ -1,0 +1,26 @@
+{
+  "name": "campusflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CAMPUSFLOW — event operating platform for university communities",
+  "workspaces": [
+    "packages/shared",
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"npm:dev -w server\" \"npm:dev -w web\"",
+    "build": "npm run build -w server && npm run build -w web",
+    "start": "npm run start -w server",
+    "seed": "npm run seed -w server",
+    "typecheck": "npm run typecheck -w packages/shared && npm run typecheck -w server && npm run typecheck -w web",
+    "test": "npm test -w packages/shared && npm test -w server && npm test -w web",
+    "test:e2e": "npm run e2e -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
