@@ -42,8 +42,14 @@ reportsRouter.get('/events/:id/exports/:kind.csv', requireAuth, async (req, res)
     const page = await listRegistrations(event._id, { sort: 'code', page: 1, pageSize: 100_000 });
     const regs = await Registration.find({ event: event._id }).select('externalId statusReason').lean();
     const extra = new Map(regs.map((r) => [String(r._id), r]));
+    // Participation columns appear only for events that collect documents or approve participation.
+    const docs = event.participation?.approvalRequired || event.documentRequirements?.some((d) => d.active);
     csv = toCsv(
-      ['Registration code', 'External ID', 'Kind', 'Status', 'Status detail', 'Name / team', 'Members', 'Primary email', 'Roll number', 'Payment status', 'Payment reference', `Amount due (${event.fee.currency})`, 'Source', `Registered at (${tz})`],
+      [
+        'Registration code', 'External ID', 'Kind', 'Status', 'Status detail', 'Name / team', 'Members', 'Primary email', 'Roll number', 'Payment status', 'Payment reference', `Amount due (${event.fee.currency})`,
+        ...(docs ? ['Participation', 'Documents missing', 'Documents awaiting review'] : []),
+        'Source', `Registered at (${tz})`,
+      ],
       page.items.map((r) => [
         r.code,
         extra.get(r.id)?.externalId ?? '',
@@ -57,6 +63,7 @@ reportsRouter.get('/events/:id/exports/:kind.csv', requireAuth, async (req, res)
         LABELS.paymentStatus[r.payment.status],
         r.payment.reference ?? '',
         (r.payment.amountDue / 100).toFixed(2),
+        ...(docs ? [LABELS.participationStatus[r.participation.status], r.participation.missing, r.participation.awaitingReview] : []),
         r.source,
         local(r.createdAt),
       ]),

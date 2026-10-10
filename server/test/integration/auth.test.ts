@@ -66,6 +66,34 @@ describe('authentication', () => {
     expect(after.body.user).toBeNull();
   });
 
+  it('logout revokes the session on the server: a replayed cookie is refused, other sessions survive', async () => {
+    const laptop = await login(w.app, 'p1@test.dev');
+    const phone = await login(w.app, 'p1@test.dev');
+    const before = await Session.countDocuments({ user: (await User.findOne({ email: 'p1@test.dev' }))!._id });
+
+    const out = await laptop.post('/api/auth/logout').set(H);
+    expect(out.status).toBe(204);
+    // The browser is told to drop the cookie…
+    const cleared = String(out.headers['set-cookie']);
+    expect(cleared).toMatch(/cf_sid=;/);
+    expect(cleared).toMatch(/Expires=Thu, 01 Jan 1970/i);
+    // …and the token is dead even if something kept a copy.
+    expect((await request(w.app).get('/api/me/registrations').set('Cookie', laptop.cookie)).status).toBe(401);
+    expect((await request(w.app).get('/api/auth/session').set('Cookie', laptop.cookie)).body.user).toBeNull();
+    expect(await Session.countDocuments({ user: (await User.findOne({ email: 'p1@test.dev' }))!._id })).toBe(before - 1);
+
+    // Signing out on one device does not sign the person out everywhere.
+    expect((await request(w.app).get('/api/me/registrations').set('Cookie', phone.cookie)).status).toBe(200);
+  });
+
+  it('logout is idempotent and still needs the client header', async () => {
+    expect((await request(w.app).post('/api/auth/logout').set(H)).status).toBe(204);
+    // Without the header a cross-site page could sign people out.
+    const forced = await request(w.app).post('/api/auth/logout');
+    expect(forced.status).toBe(403);
+    expect(forced.body.error.code).toBe('csrf_rejected');
+  });
+
   it('requires authentication for protected endpoints', async () => {
     await request(w.app).get('/api/me/registrations').expect(401);
     await request(w.app).get('/api/workspace/events').expect(401);

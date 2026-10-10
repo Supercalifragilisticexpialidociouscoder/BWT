@@ -207,6 +207,7 @@ eventsRouter.get('/workspace/events', requireAuth, async (req, res) => {
       ...eventSummaryDTO(e, ctx),
       counts: { registrations: mr.get(id) ?? 0, confirmed: mc.get(id) ?? 0, participants: mt.get(id) ?? 0, pendingPayments: mp.get(id) ?? 0, checkedIn: mk.get(id) ?? 0 },
       access: access.via === 'checkin' || access.via === 'manager' ? access.via : access.via === 'admin' ? 'admin' : access.via === 'organization' ? 'organization' : 'owner',
+      usesDocuments: Boolean(e.participation?.approvalRequired || e.documentRequirements?.some((r) => r.active)),
     };
   });
   res.json(out);

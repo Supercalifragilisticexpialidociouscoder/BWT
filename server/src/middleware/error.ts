@@ -13,8 +13,10 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return res.status(err.status).json({ error: { code: err.code, message: err.message, details: err.details } });
   }
   if (err instanceof multer.MulterError) {
-    const message = err.code === 'LIMIT_FILE_SIZE' ? 'File is too large' : 'File upload failed';
-    return res.status(400).json({ error: { code: 'upload_failed', message } });
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: { code: 'file_too_large', message: 'That file is too large. Upload a smaller file (documents: up to 5 MB).' } });
+    }
+    return res.status(400).json({ error: { code: 'upload_failed', message: 'Upload one file at a time, with nothing else in the form.' } });
   }
   if (isDuplicateKeyError(err)) {
     return res.status(409).json({ error: { code: 'duplicate', message: 'That record already exists' } });

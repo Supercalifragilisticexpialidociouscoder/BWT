@@ -14,6 +14,7 @@ export default defineConfig({
       TICKET_SECRET: 'test-secret-test-secret-test-secret-0123456789',
       WEB_ORIGIN: 'http://localhost:5173',
       UPLOAD_DIR: 'test/.uploads',
+      DOCUMENT_DIR: 'test/.documents',
     },
   },
 });

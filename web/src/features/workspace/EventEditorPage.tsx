@@ -28,6 +28,7 @@ import { useToast } from '../../components/ui/Toast';
 import { EventPoster } from '../../components/EventPoster';
 import { VenuePanel } from './EventVenuePanel';
 import { StaffPanel, ActivityPanel } from './EventStaffPanel';
+import { DocumentsPanel } from '../documents/DocumentsPanel';
 
 interface FormValues {
   title: string;
@@ -54,7 +55,7 @@ interface FormValues {
   schedule: { startsAt: string; endsAt: string; title: string; location: string }[];
 }
 
-type Tab = 'details' | 'registration' | 'schedule' | 'venue' | 'staff' | 'activity';
+type Tab = 'details' | 'registration' | 'schedule' | 'venue' | 'documents' | 'staff' | 'activity';
 
 function toForm(e: EventDetailDTO, tz: string): FormValues {
   return {
@@ -233,6 +234,7 @@ export function EventEditorPage() {
     ...(!isNew
       ? ([
           { value: 'venue', label: `Venue${e?.allocations.length ? ` · ${e.allocations.length}` : ''}` },
+          { value: 'documents', label: `Documents${e?.documents.requirements.length ? ` · ${e.documents.requirements.length}` : ''}` },
           { value: 'staff', label: `Staff${e?.staff?.length ? ` · ${e.staff.length}` : ''}` },
           { value: 'activity', label: 'Activity' },
         ] as const)
@@ -265,7 +267,12 @@ export function EventEditorPage() {
               <Field label="Title" required error={err('title')} className="lg:col-span-2">
                 {({ id: fid, describedBy, invalid }) => <Input id={fid} aria-describedby={describedBy} aria-invalid={invalid} {...register('title')} />}
               </Field>
-              <Field label="Organized by" required error={err('organization')}>
+              <Field
+                label="Organized by"
+                required
+                hint={access.isAdmin ? 'As a platform administrator you can create events for any organization. Its organizers can manage the event too.' : undefined}
+                error={err('organization')}
+              >
                 {({ id: fid, describedBy, invalid }) => (
                   <Select id={fid} aria-describedby={describedBy} aria-invalid={invalid} {...register('organization')}>
                     <option value="">Choose…</option>
@@ -461,6 +468,7 @@ export function EventEditorPage() {
         </form>
       )}
       {e && tab === 'venue' && <VenuePanel event={e} />}
+      {e && tab === 'documents' && <DocumentsPanel event={e} />}
       {e && tab === 'staff' && <StaffPanel event={e} />}
       {e && tab === 'activity' && <ActivityPanel event={e} />}
     </div>

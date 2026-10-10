@@ -1,13 +1,24 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { SessionDTO } from '@campusflow/shared';
 import { MotionConfig } from 'motion/react';
 import { ApiError } from './lib/api';
+import { sessionKey } from './lib/session';
 import { ToastProvider } from './components/ui/Toast';
 import { App } from './App';
 import './styles/index.css';
 
-const queryClient = new QueryClient({
+const queryClient: QueryClient = new QueryClient({
+  queryCache: new QueryCache({
+    // A 401 while we believe someone is signed in means the session ended elsewhere (expiry, another
+    // device, a server restart with a wiped DB): re-read the session so the UI stops showing them.
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 401 && queryClient.getQueryData<SessionDTO>(sessionKey)?.user) {
+        void queryClient.invalidateQueries({ queryKey: sessionKey });
+      }
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 15_000,

@@ -28,6 +28,11 @@ export function nextAction(r: RegistrationDTO): { label: string; detail: string 
     return { label: 'Submit payment reference', detail: 'Organizers verify it before confirming' };
   }
   if (r.payment.status === 'rejected' && r.viewer.isLeader) return { label: 'Resubmit payment', detail: r.payment.note ?? 'The reference was rejected' };
+  if (r.participation?.status === 'changes_requested') return { label: 'Fix a document', detail: 'The organizers asked for a corrected document' };
+  if (r.participation?.status === 'not_submitted') {
+    const n = r.participation.counts.missing;
+    return { label: 'Upload documents', detail: `${n} required document${n === 1 ? '' : 's'} still missing${r.kind === 'team' ? ' for your team' : ''}` };
+  }
   return null;
 }
 

@@ -146,6 +146,11 @@ describe('real-time channel', () => {
     sockets.push(s);
     return s;
   };
+  const connected = async (cookie: string) => {
+    const s = open(cookie);
+    await new Promise<void>((r) => s.on('connect', () => r()));
+    return s;
+  };
   const subscribe = (s: Socket, id: string) => new Promise<{ ok: boolean; error?: string }>((resolve) => s.emit('subscribe', { eventId: id }, resolve));
 
   it('refuses connections without a session', async () => {
@@ -174,5 +179,23 @@ describe('real-time channel', () => {
     expect(msg.checkInId).toBe(res.body.checkInId);
     // The message is a hint; the authoritative record exists in the database.
     expect(await CheckIn.exists({ _id: msg.checkInId as string, active: true })).toBeTruthy();
+  });
+
+  it('closes the sockets of a session when it signs out, and refuses the old cookie afterwards', async () => {
+    const staff = await login(w.app, 'volunteer@test.dev');
+    const s = open(staff.cookie);
+    await new Promise<void>((r) => s.on('connect', () => r()));
+    expect(await subscribe(s, eventId)).toEqual({ ok: true });
+
+    const closed = new Promise<string>((resolve) => s.on('disconnect', resolve));
+    await staff.post('/api/auth/logout').set(H).expect(204);
+    expect(await closed).toBe('io server disconnect');
+
+    const again = open(staff.cookie);
+    const err = await new Promise<Error>((resolve) => again.on('connect_error', resolve));
+    expect(err.message).toBe('unauthorized');
+
+    // Other sessions of the same person keep their live channel.
+    expect(await subscribe(await connected(vol.cookie), eventId)).toEqual({ ok: true });
   });
 });

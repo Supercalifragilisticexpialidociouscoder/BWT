@@ -2,7 +2,7 @@
   "name": "campusflow",
   "version": "0.1.0",
   "private": true,
-  "description": "CAMPUSFLOW — event operating platform for university communities",
+  "description": "CAMPUSFLOW \u2014 event operating platform for university communities",
   "workspaces": [
     "packages/shared",
     "server",
@@ -18,7 +18,9 @@
     "seed": "npm run seed -w server",
     "typecheck": "npm run typecheck -w packages/shared && npm run typecheck -w server && npm run typecheck -w web",
     "test": "npm test -w packages/shared && npm test -w server && npm test -w web",
-    "test:e2e": "npm run e2e -w web"
+    "test:e2e": "npm run e2e -w web",
+    "demo:reset": "npm run seed -w server",
+    "demo:shots": "node scripts/demo-screenshots.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

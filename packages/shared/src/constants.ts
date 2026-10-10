@@ -54,6 +54,67 @@ export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
 export const CHECKIN_OUTCOMES = ['valid', 'already_checked_in', 'invalid', 'wrong_event', 'not_eligible'] as const;
 export type CheckInOutcome = (typeof CHECKIN_OUTCOMES)[number];
 
+/* ------------------------------------------------------------------ documents & participation approval */
+
+/**
+ * Kinds of document an event can ask for. CAMPUSFLOW supplies no wording for any of them: organizers
+ * describe what they need and may attach their institution's own template.
+ */
+export const DOCUMENT_TYPES = ['permission_letter', 'guardian_undertaking', 'other'] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+/**
+ * Who a requirement applies to:
+ *  registrant  – the person who registered (the team leader for teams)
+ *  each_member – every participant, individually (each uploads their own)
+ *  team        – one document for the whole team, uploaded by the leader and visible to members
+ * For individual registrations all three mean "the participant".
+ */
+export const DOCUMENT_SCOPES = ['registrant', 'each_member', 'team'] as const;
+export type DocumentScope = (typeof DOCUMENT_SCOPES)[number];
+
+export const DOCUMENT_FORMATS = ['pdf', 'jpg', 'png'] as const;
+export type DocumentFormat = (typeof DOCUMENT_FORMATS)[number];
+
+/** Upper bound for one uploaded document or template. */
+export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+
+/**
+ * submitted          – uploaded; waiting for a reviewer if the requirement needs review
+ * approved           – a reviewer accepted this version
+ * changes_requested  – a reviewer asked for a corrected file
+ * rejected           – a reviewer refused this file; a different one is needed
+ */
+export const DOCUMENT_STATUSES = ['submitted', 'approved', 'changes_requested', 'rejected'] as const;
+export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
+
+/**
+ * Participation approval for a registration (separate from registration status: it never changes
+ * seats, teams, payments or tickets, and only affects check-in when the event says so).
+ *  not_required      – the event asks for no documents and no approval
+ *  not_submitted     – at least one required document is missing
+ *  submitted         – everything required is in; nothing reviewed yet
+ *  under_review      – review has started, or documents are complete and await the organizer's decision
+ *  changes_requested – a reviewer asked for a corrected or different document
+ *  approved          – approved by an organizer (or every reviewed document approved, when the event
+ *                      doesn't ask for a separate decision). Never set by registering.
+ *  rejected          – organizers declined participation
+ */
+export const PARTICIPATION_STATUSES = [
+  'not_required',
+  'not_submitted',
+  'submitted',
+  'under_review',
+  'changes_requested',
+  'approved',
+  'rejected',
+] as const;
+export type ParticipationStatus = (typeof PARTICIPATION_STATUSES)[number];
+
+/** Organizer filters on the registrations list. */
+export const PARTICIPATION_FILTERS = ['approval_pending', 'docs_missing', 'awaiting_review', 'changes_requested', 'approved', 'rejected'] as const;
+export type ParticipationFilter = (typeof PARTICIPATION_FILTERS)[number];
+
 /** Suggested facility tags. Venues may use any slug; these are offered in pickers. */
 export const COMMON_FACILITIES = [
   'projector',
@@ -149,6 +210,44 @@ export const LABELS = {
     wrong_event: 'Wrong event',
     not_eligible: 'Not eligible',
   } satisfies Record<CheckInOutcome, string>,
+  documentType: {
+    permission_letter: 'Participation permission letter',
+    guardian_undertaking: 'Parent / guardian undertaking',
+    other: 'Other document',
+  } satisfies Record<DocumentType, string>,
+  documentScope: {
+    registrant: 'The registrant',
+    each_member: 'Each participant',
+    team: 'One per team',
+  } satisfies Record<DocumentScope, string>,
+  documentFormat: {
+    pdf: 'PDF',
+    jpg: 'JPG',
+    png: 'PNG',
+  } satisfies Record<DocumentFormat, string>,
+  documentStatus: {
+    submitted: 'Submitted',
+    approved: 'Approved',
+    changes_requested: 'Changes requested',
+    rejected: 'Rejected',
+  } satisfies Record<DocumentStatus, string>,
+  participationStatus: {
+    not_required: 'Not required',
+    not_submitted: 'Documents missing',
+    submitted: 'Submitted',
+    under_review: 'Under review',
+    changes_requested: 'Changes requested',
+    approved: 'Approved',
+    rejected: 'Not approved',
+  } satisfies Record<ParticipationStatus, string>,
+  participationFilter: {
+    approval_pending: 'Approval pending',
+    docs_missing: 'Documents missing',
+    awaiting_review: 'Awaiting review',
+    changes_requested: 'Corrections requested',
+    approved: 'Approved',
+    rejected: 'Not approved',
+  } satisfies Record<ParticipationFilter, string>,
   importField: {
     externalId: 'Registration ID',
     teamName: 'Team name',

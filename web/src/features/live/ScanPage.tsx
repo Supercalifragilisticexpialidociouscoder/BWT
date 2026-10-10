@@ -330,7 +330,7 @@ function ResultPanel({ shown, onDismiss }: { shown: Shown; onDismiss: () => void
         <div className="flex items-center gap-3">
           <Icon className={clsx('size-10', tone.split(' ')[1])} aria-hidden />
           <h2 id="scan-result" className="text-2xl font-semibold">
-            {def.title}
+            {r.reason === 'participation_not_approved' ? 'Participation not approved' : def.title}
           </h2>
         </div>
         {r.participant && <p className="mt-4 text-3xl font-semibold leading-tight tracking-tight">{r.participant.name}</p>}

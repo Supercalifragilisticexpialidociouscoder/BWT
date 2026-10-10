@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, FileUp, Search } from 'lucide-react';
 import clsx from 'clsx';
-import { LABELS, PAYMENT_STATUSES, REGISTRATION_STATUSES, formatMoney, type Page, type RegistrationRowDTO, type WorkspaceEventDTO } from '@campusflow/shared';
+import { LABELS, PARTICIPATION_FILTERS, PAYMENT_STATUSES, REGISTRATION_STATUSES, formatMoney, type Page, type RegistrationRowDTO, type WorkspaceEventDTO } from '@campusflow/shared';
 import { api } from '../../lib/api';
 import { relativeTime } from '../../lib/format';
 import { ButtonLink } from '../../components/ui/Button';
@@ -75,14 +75,16 @@ function RegistrationsTable({ event }: { event: WorkspaceEventDTO }) {
   }, [q]);
   const status = params.get('status');
   const payment = params.get('payment');
+  const participation = params.get('participation');
+  const showParticipation = event.usesDocuments || Boolean(participation);
   const sort = params.get('sort') ?? '-createdAt';
   const page = Number(params.get('page') ?? 1);
   const pageSize = 25;
   const openId = params.get('reg');
 
   const list = useQuery({
-    queryKey: ['registrations', event.id, { q, status, payment, sort, page }],
-    queryFn: () => api<Page<RegistrationRowDTO>>(`/events/${event.id}/registrations`, { query: { q, status, payment, sort, page, pageSize } }),
+    queryKey: ['registrations', event.id, { q, status, payment, participation, sort, page }],
+    queryFn: () => api<Page<RegistrationRowDTO>>(`/events/${event.id}/registrations`, { query: { q, status, payment, participation, sort, page, pageSize } }),
     placeholderData: keepPreviousData,
   });
   const total = list.data?.total ?? 0;
@@ -148,6 +150,16 @@ function RegistrationsTable({ event }: { event: WorkspaceEventDTO }) {
             </option>
           ))}
         </select>
+        {showParticipation && (
+          <select aria-label="Documents and participation" className="field !w-auto !py-2 !text-[13px]" value={participation ?? ''} onChange={(e) => set({ participation: e.target.value || null })}>
+            <option value="">Any participation</option>
+            {PARTICIPATION_FILTERS.map((s) => (
+              <option key={s} value={s}>
+                {LABELS.participationFilter[s]}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {list.isError ? (
@@ -156,8 +168,8 @@ function RegistrationsTable({ event }: { event: WorkspaceEventDTO }) {
         <LoadingBlock rows={6} />
       ) : list.data.items.length === 0 ? (
         <EmptyState
-          title={q || status || payment ? 'No registrations match' : 'No registrations yet'}
-          body={q || status || payment ? 'Try another search or clear the filters.' : event.status === 'draft' ? 'Publish the event to start taking registrations, or import an existing export.' : 'Registrations appear here the moment someone signs up.'}
+          title={q || status || payment || participation ? 'No registrations match' : 'No registrations yet'}
+          body={q || status || payment || participation ? 'Try another search or clear the filters.' : event.status === 'draft' ? 'Publish the event to start taking registrations, or import an existing export.' : 'Registrations appear here the moment someone signs up.'}
         />
       ) : (
         <div className={clsx('transition-opacity', list.isFetching && 'opacity-70')}>
@@ -171,6 +183,7 @@ function RegistrationsTable({ event }: { event: WorkspaceEventDTO }) {
                   <th className="px-4 py-2.5 font-medium">Contact</th>
                   <SortHead field="status">Status</SortHead>
                   <th className="px-4 py-2.5 font-medium">Payment</th>
+                  {showParticipation && <th className="px-4 py-2.5 font-medium">Documents</th>}
                   <SortHead field="createdAt" className="text-right">
                     Registered
                   </SortHead>
@@ -204,6 +217,16 @@ function RegistrationsTable({ event }: { event: WorkspaceEventDTO }) {
                       <StatusPill kind="payment" value={r.payment.status} label={r.payment.status === 'pending' ? (r.payment.reference ? 'To verify' : 'No reference') : undefined} />
                       {r.payment.status !== 'not_required' && <span className="tnum block text-xs text-paper-3">{formatMoney(r.payment.amountDue)}</span>}
                     </td>
+                    {showParticipation && (
+                      <td className="px-4 py-3">
+                        <StatusPill kind="participation" value={r.participation.status} label={r.participation.readyForDecision ? 'Ready for decision' : undefined} />
+                        {(r.participation.missing > 0 || r.participation.awaitingReview > 0) && (
+                          <span className="tnum block text-xs text-paper-3">
+                            {[r.participation.missing ? `${r.participation.missing} missing` : null, r.participation.awaitingReview ? `${r.participation.awaitingReview} to review` : null].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </td>
+                    )}
                     <td className="tnum px-4 py-3 text-right text-paper-3" title={r.createdAt}>
                       {relativeTime(r.createdAt)}
                     </td>
@@ -227,8 +250,9 @@ function RegistrationsTable({ event }: { event: WorkspaceEventDTO }) {
                     </div>
                     <StatusPill kind="registration" value={r.status} />
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-paper-3">
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-paper-3">
                     <StatusPill kind="payment" value={r.payment.status} />
+                    {showParticipation && <StatusPill kind="participation" value={r.participation.status} label={r.participation.readyForDecision ? 'Ready for decision' : undefined} />}
                     <span>{relativeTime(r.createdAt)}</span>
                   </div>
                 </button>

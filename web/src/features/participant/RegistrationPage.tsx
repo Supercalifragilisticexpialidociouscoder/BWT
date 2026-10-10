@@ -14,6 +14,7 @@ import { useToast } from '../../components/ui/Toast';
 import { NotFound } from '../../router';
 import { useSession } from '../../lib/session';
 import { RegistrationProgress } from './Progress';
+import { RegistrationDocuments } from '../documents/RegistrationDocuments';
 
 export function useRegistration(id: string | undefined) {
   return useQuery({ queryKey: ['registration', id], queryFn: () => api<RegistrationDTO>(`/registrations/${id}`), enabled: Boolean(id) });
@@ -89,9 +90,16 @@ export function RegistrationPage() {
       </div>
 
       <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-12">
+        <div className="min-w-0 space-y-12">
           {r.kind === 'team' && r.team && <TeamSection r={r} onChange={apply} />}
           {r.payment.required && <PaymentSection r={r} onChange={apply} />}
+          <RegistrationDocuments
+            registrationId={r.id}
+            eventId={r.event.id}
+            mode="participant"
+            closed={closed}
+            heading={(content) => content && <Section title="Documents & participation approval">{content}</Section>}
+          />
           {r.approval.required && (
             <Section title="Organizer review">
               <p className="text-sm text-paper-2">

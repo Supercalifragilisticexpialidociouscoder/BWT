@@ -6,7 +6,7 @@ import { Event, User } from '../models';
 import { eventAccess } from '../lib/access';
 import { logger } from '../lib/logger';
 import { SESSION_COOKIE, parseCookieHeader, resolveSession, type AuthUser } from '../middleware/auth';
-import { attachIo, eventRoom } from './bus';
+import { attachIo, eventRoom, sessionRoom } from './bus';
 
 type Ack = (res: { ok: boolean; error?: string }) => void;
 
@@ -36,6 +36,7 @@ export function initRealtime(httpServer: HttpServer): Server {
       const resolved = await resolveSession(cookies[SESSION_COOKIE]);
       if (!resolved) return next(new Error('unauthorized'));
       socket.data.userId = String(resolved.user._id);
+      socket.data.sessionId = String(resolved.session._id);
       next();
     } catch (err) {
       logger.error('socket auth failed', { err });
@@ -44,6 +45,7 @@ export function initRealtime(httpServer: HttpServer): Server {
   });
 
   io.on('connection', (socket) => {
+    void socket.join(sessionRoom(socket.data.sessionId as string));
     socket.on('subscribe', async (payload: { eventId?: unknown }, ack?: Ack) => {
       try {
         const eventId = typeof payload?.eventId === 'string' ? payload.eventId : '';

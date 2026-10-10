@@ -16,11 +16,18 @@ import {
   Lock,
   Hourglass,
   Users,
+  FileClock,
+  FileWarning,
+  FilePen,
+  ShieldCheck,
+  Eye,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
   LABELS,
+  type DocumentStatus,
   type EventStatus,
+  type ParticipationStatus,
   type PaymentStatus,
   type RegistrationStatus,
   type RegistrationWindowState,
@@ -79,7 +86,24 @@ const windowState: Record<RegistrationWindowState, Def> = {
   draft: { tone: 'muted', icon: PencilLine, label: 'Draft' },
 };
 
-const maps = { registration, payment, ticket, event, window: windowState };
+const participation: Record<ParticipationStatus, Def> = {
+  not_required: { tone: 'muted', icon: Minus, label: LABELS.participationStatus.not_required },
+  not_submitted: { tone: 'warn', icon: FileWarning, label: LABELS.participationStatus.not_submitted },
+  submitted: { tone: 'info', icon: FileClock, label: LABELS.participationStatus.submitted },
+  under_review: { tone: 'info', icon: Eye, label: LABELS.participationStatus.under_review },
+  changes_requested: { tone: 'warn', icon: FilePen, label: LABELS.participationStatus.changes_requested },
+  approved: { tone: 'ok', icon: ShieldCheck, label: LABELS.participationStatus.approved },
+  rejected: { tone: 'bad', icon: Ban, label: LABELS.participationStatus.rejected },
+};
+const document: Record<DocumentStatus | 'missing', Def> = {
+  missing: { tone: 'muted', icon: CircleDashed, label: 'Not uploaded' },
+  submitted: { tone: 'info', icon: Clock, label: LABELS.documentStatus.submitted },
+  approved: { tone: 'ok', icon: CircleCheck, label: LABELS.documentStatus.approved },
+  changes_requested: { tone: 'warn', icon: FilePen, label: LABELS.documentStatus.changes_requested },
+  rejected: { tone: 'bad', icon: CircleX, label: LABELS.documentStatus.rejected },
+};
+
+const maps = { registration, payment, ticket, event, window: windowState, participation, document };
 
 export function StatusPill<K extends keyof typeof maps>({
   kind,

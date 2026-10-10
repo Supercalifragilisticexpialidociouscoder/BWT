@@ -1,9 +1,14 @@
 import mongoose, { Schema, model, type Types } from 'mongoose';
 import {
   ALLOCATION_STATUSES,
+  DOCUMENT_FORMATS,
+  DOCUMENT_SCOPES,
+  DOCUMENT_STATUSES,
+  DOCUMENT_TYPES,
   EVENT_STATUSES,
   FEE_BASIS,
   ORGANIZATION_KINDS,
+  PARTICIPATION_STATUSES,
   PAYMENT_STATUSES,
   REGISTRATION_MODES,
   REGISTRATION_STATUSES,
@@ -12,9 +17,15 @@ import {
   USER_ROLES,
   VENUE_KINDS,
   type AllocationStatus,
+  type DocumentFormat,
+  type DocumentHistoryAction,
+  type DocumentScope,
+  type DocumentStatus,
+  type DocumentType,
   type EventStatus,
   type FeeBasis,
   type OrganizationKind,
+  type ParticipationStatus,
   type PaymentStatus,
   type RegistrationMode,
   type RegistrationStatus,
@@ -179,7 +190,54 @@ SessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const Session = model<ISession>('Session', SessionSchema);
 
+/* ------------------------------------------------------------------ Stored files */
+
+/**
+ * A privately stored upload. `storedName` is a random server-chosen name inside DOCUMENT_DIR,
+ * never under the public /uploads mount; files are served only through authorized routes.
+ */
+export interface IStoredFile {
+  storedName: string;
+  /** Sanitised original name, used only as the download filename. */
+  originalName: string;
+  mime: string;
+  size: number;
+  sha256: string;
+  uploadedBy: Id | null;
+  uploadedAt: Date;
+}
+
+const StoredFileSchema = new Schema<IStoredFile>(
+  {
+    storedName: { type: String, required: true },
+    originalName: { type: String, required: true },
+    mime: { type: String, required: true },
+    size: { type: Number, required: true },
+    sha256: { type: String, required: true },
+    uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    uploadedAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
 /* ------------------------------------------------------------------ Event */
+
+export interface IDocumentRequirement {
+  /** Stable server-assigned identifier (8 chars); submissions refer to it. */
+  key: string;
+  type: DocumentType;
+  name: string;
+  description: string;
+  required: boolean;
+  appliesTo: DocumentScope;
+  deadline: Date | null;
+  formats: DocumentFormat[];
+  reviewRequired: boolean;
+  /** Inactive requirements are hidden from participants; their submissions are kept. */
+  active: boolean;
+  template: IStoredFile | null;
+  createdAt: Date;
+}
 
 export interface IScheduleItem {
   startsAt: Date;
@@ -225,6 +283,8 @@ export interface IEvent {
   checkInOpensMinutesBefore: number;
   schedule: IScheduleItem[];
   staff: IStaffAssignment[];
+  documentRequirements: IDocumentRequirement[];
+  participation: { approvalRequired: boolean; checkInRequiresApproval: boolean };
   status: EventStatus;
   publishedAt: Date | null;
   cancelledAt: Date | null;
@@ -286,6 +346,27 @@ const EventSchema = new Schema<IEvent>(
         addedAt: { type: Date, default: () => new Date() },
       },
     ],
+    documentRequirements: [
+      {
+        _id: false,
+        key: { type: String, required: true },
+        type: { type: String, enum: DOCUMENT_TYPES, required: true },
+        name: { type: String, required: true },
+        description: { type: String, default: '' },
+        required: { type: Boolean, default: true },
+        appliesTo: { type: String, enum: DOCUMENT_SCOPES, required: true },
+        deadline: { type: Date, default: null },
+        formats: [{ type: String, enum: DOCUMENT_FORMATS }],
+        reviewRequired: { type: Boolean, default: true },
+        active: { type: Boolean, default: true },
+        template: { type: StoredFileSchema, default: null },
+        createdAt: { type: Date, default: () => new Date() },
+      },
+    ],
+    participation: {
+      approvalRequired: { type: Boolean, default: false },
+      checkInRequiresApproval: { type: Boolean, default: false },
+    },
     status: { type: String, enum: EVENT_STATUSES, default: 'draft' },
     publishedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },
@@ -385,6 +466,7 @@ export interface IRegistration {
    */
   activeKey?: string;
   approval: { decidedAt: Date | null; decidedBy: Id | null; approved: boolean | null; note: string | null };
+  participation: IParticipation;
   source: 'web' | 'import';
   externalId: string | null;
   importBatch: Id | null;
@@ -394,6 +476,30 @@ export interface IRegistration {
   isDemo: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Participation approval (documents), separate from registration status. `status` and `counts`
+ * are derived (modules/documents/status.ts) and stored so organizers can filter; every write that
+ * affects them bumps `rev`, and the derived fields are only written if `rev` is unchanged since
+ * they were computed — a late recomputation can never overwrite a newer one.
+ */
+export interface IParticipation {
+  status: ParticipationStatus;
+  rev: number;
+  counts: { required: number; missing: number; awaitingReview: number; changesRequested: number; approved: number };
+  readyForDecision: boolean;
+  /**
+   * The organizer's explicit decision. An approval records the exact document versions it covered;
+   * it stops counting as soon as any of them is replaced or a new document becomes due.
+   */
+  decision: {
+    value: 'approved' | 'rejected';
+    by: Id;
+    at: Date;
+    note: string | null;
+    snapshot: { slot: string; version: number }[];
+  } | null;
 }
 
 const RegistrationSchema = new Schema<IRegistration>(
@@ -412,6 +518,31 @@ const RegistrationSchema = new Schema<IRegistration>(
       approved: { type: Boolean, default: null },
       note: { type: String, default: null },
     },
+    participation: {
+      status: { type: String, enum: PARTICIPATION_STATUSES, default: 'not_required' },
+      rev: { type: Number, default: 0 },
+      counts: {
+        required: { type: Number, default: 0 },
+        missing: { type: Number, default: 0 },
+        awaitingReview: { type: Number, default: 0 },
+        changesRequested: { type: Number, default: 0 },
+        approved: { type: Number, default: 0 },
+      },
+      readyForDecision: { type: Boolean, default: false },
+      decision: {
+        type: new Schema(
+          {
+            value: { type: String, enum: ['approved', 'rejected'], required: true },
+            by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+            at: { type: Date, required: true },
+            note: { type: String, default: null },
+            snapshot: [{ _id: false, slot: { type: String, required: true }, version: { type: Number, required: true } }],
+          },
+          { _id: false },
+        ),
+        default: null,
+      },
+    },
     source: { type: String, enum: ['web', 'import'], default: 'web' },
     externalId: { type: String, default: null },
     importBatch: { type: Schema.Types.ObjectId, ref: 'ImportBatch', default: null },
@@ -425,12 +556,102 @@ const RegistrationSchema = new Schema<IRegistration>(
 RegistrationSchema.index({ activeKey: 1 }, { unique: true, sparse: true });
 RegistrationSchema.index({ event: 1, status: 1 });
 RegistrationSchema.index({ event: 1, createdAt: -1 });
+RegistrationSchema.index({ event: 1, 'participation.status': 1 });
 RegistrationSchema.index(
   { event: 1, externalId: 1 },
   { unique: true, partialFilterExpression: { externalId: { $type: 'string' } } },
 );
 
 export const Registration = model<IRegistration>('Registration', RegistrationSchema);
+
+/* ------------------------------------------------------------------ Participant documents */
+
+export interface IDocumentHistoryEntry {
+  action: DocumentHistoryAction;
+  by: Id | null;
+  at: Date;
+  version: number;
+  note: string | null;
+}
+
+/**
+ * One document slot a registration owes (a requirement × the person or team it is about).
+ * Replacing the file keeps the previous one in `previous`; history is append-only. `version`
+ * increments on every upload, and reviews are conditional on the version the reviewer opened.
+ */
+export interface IParticipantDocument {
+  _id: Id;
+  event: Id;
+  registration: Id;
+  requirementKey: string;
+  /** The person the document is about; null for team-level documents. */
+  subject: Id | null;
+  /** `<requirementKey>:<subjectId | team>` — unique per registration. */
+  slot: string;
+  status: DocumentStatus;
+  version: number;
+  file: IStoredFile;
+  previous: (IStoredFile & { version: number; statusWhenReplaced: DocumentStatus })[];
+  review: { by: Id; at: Date; note: string | null } | null;
+  history: IDocumentHistoryEntry[];
+  isDemo: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const ParticipantDocumentSchema = new Schema<IParticipantDocument>(
+  {
+    event: { type: Schema.Types.ObjectId, ref: 'Event', required: true },
+    registration: { type: Schema.Types.ObjectId, ref: 'Registration', required: true },
+    requirementKey: { type: String, required: true },
+    subject: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    slot: { type: String, required: true },
+    status: { type: String, enum: DOCUMENT_STATUSES, required: true },
+    version: { type: Number, required: true, min: 1 },
+    file: { type: StoredFileSchema, required: true },
+    previous: [
+      new Schema(
+        {
+          storedName: String,
+          originalName: String,
+          mime: String,
+          size: Number,
+          sha256: String,
+          uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+          uploadedAt: Date,
+          version: Number,
+          statusWhenReplaced: { type: String, enum: DOCUMENT_STATUSES },
+        },
+        { _id: false },
+      ),
+    ],
+    review: {
+      type: new Schema(
+        { by: { type: Schema.Types.ObjectId, ref: 'User', required: true }, at: { type: Date, required: true }, note: { type: String, default: null } },
+        { _id: false },
+      ),
+      default: null,
+    },
+    history: [
+      {
+        _id: false,
+        action: { type: String, required: true },
+        by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+        at: { type: Date, required: true },
+        version: { type: Number, required: true },
+        note: { type: String, default: null },
+      },
+    ],
+    isDemo: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+);
+/** One document per slot per registration: concurrent first uploads cannot create two. */
+ParticipantDocumentSchema.index({ registration: 1, slot: 1 }, { unique: true });
+ParticipantDocumentSchema.index({ event: 1, status: 1 });
+ParticipantDocumentSchema.index({ event: 1, requirementKey: 1 });
+
+export const ParticipantDocument = model<IParticipantDocument>('ParticipantDocument', ParticipantDocumentSchema);
 
 /* ------------------------------------------------------------------ Payment */
 
@@ -731,6 +952,7 @@ export const ALL_MODELS = [
   Team,
   TeamMembership,
   Registration,
+  ParticipantDocument,
   PaymentRecord,
   Ticket,
   CheckIn,

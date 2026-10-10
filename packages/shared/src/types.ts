@@ -1,10 +1,15 @@
 import type {
   AllocationStatus,
   CheckInOutcome,
+  DocumentFormat,
+  DocumentScope,
+  DocumentStatus,
+  DocumentType,
   EventStatus,
   FeeBasis,
   ImportField,
   OrganizationKind,
+  ParticipationStatus,
   PaymentStatus,
   RegistrationMode,
   RegistrationStatus,
@@ -156,6 +161,8 @@ export interface EventDetailDTO extends EventSummaryDTO {
   allocations: AllocationDTO[];
   staff: StaffMemberDTO[] | null;
   finalizedAt: string | null;
+  /** What participants will be asked to provide (active requirements only). */
+  documents: { approvalRequired: boolean; checkInRequiresApproval: boolean; requirements: DocumentRequirementDTO[] };
   viewer: {
     canManage: boolean;
     canCheckIn: boolean;
@@ -237,6 +244,7 @@ export interface RegistrationDTO {
   participants: ParticipantDTO[];
   payment: PaymentDTO;
   approval: { required: boolean; decidedAt: string | null; decidedBy: { id: string; name: string } | null; note: string | null };
+  participation: ParticipationSummaryDTO;
   createdAt: string;
   updatedAt: string;
   cancelledAt: string | null;
@@ -255,8 +263,104 @@ export interface RegistrationRowDTO {
   primaryEmail: string;
   primaryRollNumber: string | null;
   payment: { status: PaymentStatus; reference: string | null; amountDue: number; submittedAt: string | null };
+  participation: { status: ParticipationStatus; missing: number; awaitingReview: number; readyForDecision: boolean };
   source: 'web' | 'import';
   createdAt: string;
+}
+
+/* ------------------------------------------------------------------ documents & participation approval */
+
+export interface PersonRefDTO {
+  id: string;
+  name: string;
+}
+
+export interface DocumentRequirementDTO {
+  key: string;
+  type: DocumentType;
+  name: string;
+  description: string;
+  required: boolean;
+  appliesTo: DocumentScope;
+  deadline: string | null;
+  formats: DocumentFormat[];
+  reviewRequired: boolean;
+  active: boolean;
+  /** A blank form the organizers attached (their institution's own wording), if any. */
+  template: { name: string; size: number; uploadedAt: string } | null;
+}
+
+export interface DocumentConfigDTO {
+  approvalRequired: boolean;
+  checkInRequiresApproval: boolean;
+  requirements: (DocumentRequirementDTO & { submissions: number })[];
+  maxBytes: number;
+  /** False when the server cannot write to its private document directory. */
+  storageAvailable: boolean;
+}
+
+export interface ParticipationSummaryDTO {
+  status: ParticipationStatus;
+  approvalRequired: boolean;
+  checkInRequiresApproval: boolean;
+  counts: { required: number; missing: number; awaitingReview: number; changesRequested: number; approved: number };
+  /** Documents are complete and reviewed; only the organizer's participation decision is outstanding. */
+  readyForDecision: boolean;
+}
+
+export type DocumentHistoryAction = 'submitted' | 'replaced' | 'approved' | 'changes_requested' | 'rejected' | 'commented';
+
+export interface DocumentHistoryDTO {
+  action: DocumentHistoryAction;
+  at: string;
+  by: PersonRefDTO | null;
+  version: number;
+  note: string | null;
+}
+
+export interface DocumentFileDTO {
+  name: string;
+  size: number;
+  mime: string;
+  uploadedAt: string;
+  uploadedBy: PersonRefDTO | null;
+}
+
+export interface DocumentSlotDTO {
+  /** `<requirementKey>:<userId | team>` — one slot per document a registration owes. */
+  slot: string;
+  requirementKey: string;
+  /** The person the document is about; null for a team-level document. */
+  subject: PersonRefDTO | null;
+  status: DocumentStatus | 'missing';
+  canUpload: boolean;
+  /** Why the viewer can't upload right now (deadline passed, declined, not theirs…). */
+  uploadBlockedReason: string | null;
+  canView: boolean;
+  /** Present when the viewer may see the document itself. */
+  document: {
+    id: string;
+    version: number;
+    file: DocumentFileDTO;
+    review: { by: PersonRefDTO | null; at: string; note: string | null } | null;
+    history: DocumentHistoryDTO[];
+    /** Earlier versions, kept for the record (organizers only). */
+    previousVersions: { version: number; name: string; size: number; uploadedAt: string; statusWhenReplaced: DocumentStatus }[];
+  } | null;
+}
+
+export interface RegistrationDocumentsDTO {
+  registrationId: string;
+  participation: ParticipationSummaryDTO & {
+    decision: { value: 'approved' | 'rejected'; at: string; by: PersonRefDTO | null; note: string | null; current: boolean } | null;
+    /** Concurrency token: send it back with a participation decision. */
+    rev: number;
+  };
+  requirements: DocumentRequirementDTO[];
+  slots: DocumentSlotDTO[];
+  viewer: { canReview: boolean };
+  maxBytes: number;
+  storageAvailable: boolean;
 }
 
 export interface TicketDTO {
@@ -284,7 +388,7 @@ export interface CheckInResultDTO {
   outcome: CheckInOutcome;
   message: string;
   /** Machine-readable reason for not_eligible outcomes. */
-  reason?: 'registration_not_confirmed' | 'ticket_void' | 'window_not_open' | 'window_closed' | 'event_not_active';
+  reason?: 'registration_not_confirmed' | 'ticket_void' | 'window_not_open' | 'window_closed' | 'event_not_active' | 'participation_not_approved';
   checkInId?: string;
   participant?: { id: string; name: string; rollNumber: string | null; department: string | null };
   team?: { id: string; name: string; arrived: number; size: number } | null;
@@ -386,7 +490,8 @@ export interface AttentionItemDTO {
     | 'stale_draft'
     | 'unfinalized_report'
     | 'near_capacity'
-    | 'deadline_soon';
+    | 'deadline_soon'
+    | 'documents_awaiting_review';
   severity: 'high' | 'medium' | 'low';
   eventId: string;
   eventTitle: string;
@@ -404,6 +509,8 @@ export interface WorkspaceEventDTO extends EventSummaryDTO {
     checkedIn: number;
   };
   access: StaffRole | 'owner' | 'admin' | 'organization';
+  /** The event collects documents or approves participation. */
+  usesDocuments: boolean;
 }
 
 export interface CalendarEntryDTO {

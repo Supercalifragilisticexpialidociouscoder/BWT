@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Clock, CreditCard, MapPin, ScanLine, TriangleAlert, Users, FileText, Copy, Gauge, Hourglass } from 'lucide-react';
+import { ArrowRight, Plus, Clock, CreditCard, MapPin, ScanLine, TriangleAlert, Users, FileText, FileClock, Copy, Gauge, Hourglass } from 'lucide-react';
 import { LiveDot } from '../../components/ui/Status';
 import clsx from 'clsx';
 import type { AttentionItemDTO, OverviewDTO } from '@campusflow/shared';
@@ -24,6 +24,7 @@ const ICONS: Record<AttentionItemDTO['kind'], typeof Clock> = {
   unfinalized_report: FileText,
   near_capacity: Gauge,
   deadline_soon: Hourglass,
+  documents_awaiting_review: FileClock,
 };
 
 export function OverviewPage() {
@@ -33,6 +34,7 @@ export function OverviewPage() {
 }
 
 function OrganizerOverview({ name }: { name: string }) {
+  const { access } = useSession();
   const [params, setParams] = useSearchParams();
   const events = useWorkspaceEvents();
   const scope = params.get('scope');
@@ -51,19 +53,26 @@ function OrganizerOverview({ name }: { name: string }) {
         title="Overview"
         description="Live totals from the registration, payment and attendance records of the events you manage."
         actions={
-          <select
-            aria-label="Overview scope"
-            className="field !w-auto !py-2 !text-[13px]"
-            value={scope ?? ''}
-            onChange={(e) => setParams(e.target.value ? { scope: e.target.value } : {}, { replace: true })}
-          >
-            <option value="">All my events</option>
-            {scoped.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.title}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              aria-label="Overview scope"
+              className="field !w-auto !py-2 !text-[13px]"
+              value={scope ?? ''}
+              onChange={(e) => setParams(e.target.value ? { scope: e.target.value } : {}, { replace: true })}
+            >
+              <option value="">All my events</option>
+              {scoped.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.title}
+                </option>
+              ))}
+            </select>
+            {access.canOrganize && (
+              <ButtonLink to="/workspace/events/new" variant="primary" size="sm" icon={<Plus className="size-4" />}>
+                New event
+              </ButtonLink>
+            )}
+          </>
         }
       />
 

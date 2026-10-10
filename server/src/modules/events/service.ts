@@ -33,6 +33,7 @@ import type { AuthUser } from '../../middleware/auth';
 import { categoryName, getInstitution } from '../institution/service';
 import { shiftEventAllocations } from '../venues/service';
 import { recomputeEventRegistrations } from '../registrations/service';
+import { requirementDTO } from '../documents/dto';
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -212,6 +213,11 @@ export async function eventDetailDTO(e: LeanEvent, viewer: AuthUser | undefined)
     allocations: (ctx.allocations.get(String(e._id)) ?? []).map((a) => allocationDTO(a, e)),
     staff,
     finalizedAt: iso(e.finalizedAt),
+    documents: {
+      approvalRequired: e.participation?.approvalRequired ?? false,
+      checkInRequiresApproval: e.participation?.checkInRequiresApproval ?? false,
+      requirements: (e.documentRequirements ?? []).filter((r) => r.active).map(requirementDTO),
+    },
     viewer: { canManage: access.canManage, canCheckIn: access.canCheckIn, registrationId },
   };
 }
